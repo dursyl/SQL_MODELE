@@ -1,0 +1,246 @@
+--------------------Premier pas-------
+    -- On  peut faire aussi comme ça:
+	Import-Module SQLSERVER
+        CD SQLSERVER:\sql\localhost\DEFAULT
+
+
+    --Ces SnapIn doit exister si je veux utiliser SQLSERVER sur PowerShell
+        Get-PSSnapin SqlServerCmdLetSnapin100
+        Get-PSSnapin SqlServerProviderSnapin100
+    --Sinon il faut les ajouter   (sur 2012 pas besoin de ça, on doit  charger SQLPS)
+        Add-PSSnapin SqlServerCmdLetSnapin100
+        Add-PSSnapin SqlServerProviderSnapin100
+
+---------------------------------------   
+
+    --Se placer dans le serveur SQL
+        Set-Location SQLSERVER:\SQL\localhost
+
+    --Requête
+        Invoke-Sqlcmd -Query "SELECT DB_NAME() as [Database]"
+    
+    --Requête T-SQL
+        CD SQLSERVER:\sql\localhost\DEFAULT
+        Invoke-sqlcmd -Database TV_ATOFFICE -Query "select * from USR" | Format-Table
+    
+    --Requête T-SQL - Sortie CSV
+        CD SQLSERVER:\sql\localhost\DEFAULT
+        Invoke-sqlcmd -Database TV_ATOFFICE -Query "select * from USR" | Export-CSV c:\TV_USER.csv  -encoding "unicode"
+    
+    --Créer dossier
+        md c:\test
+    --créer fichier
+        fsutil file createnew C:\test\mynewfile.txt 1000
+    
+    --Divers stats du serveur envoyées dans un fichier
+        ipconfig /all >C:\test\tshoot.txt
+        route print >C:\test\tshoot.txt
+        hostname >C:\test\tshoot.txt
+        net statistics workstation >C:\test\tshoot.txt
+    --Ouverture fichier texte
+        notepad C:\test\tshoot.txt 
+    --Passer le noms de tables d'une base de données dans un fichier texte
+      --Lancer PowerShell en cliquant droit sur une Base de données (SSMS)
+        dir -Name >C:\test\TableNes.txt
+
+
+
+
+
+
+
+-----------------------------------------------
+
+#https://www.mssqltips.com/sqlservertip/1745/using-powershell-with-sql-server-management-objects-smo/
+--recuperer des scripts : https://github.com/MikeFal 
+
+--PLusieurs lignes de commentaires
+<#
+#>
+
+--Voir les Provider à disposition (on doit voir SQLServer apparaitre dans la liste
+Get-PSProvider
+   
+--Voir les DRIVE (connecteurs disque c:\ d:\)
+Get-PSDrive
+
+--Voir les enfants du provider dans lequel on est
+Get-ChildItem
+
+--Si Dans Get-PSDrive: SQLSERVER apparait alors je peux naviguer dans SQL Server
+  -- Si je fait "dir" ici alors j'ai tout le parametrage de mon serveur
+SQLSERVER:\SQL\DELLV-SD\Default 
+
+--Ces SnapIn doit exister si je veux utiliser SQLSERVER sur PowerShell
+Get-PSSnapin SqlServerCmdLetSnapin100
+Get-PSSnapin SqlServerProviderSnapin100
+--Sinon il faut les ajouter   (sur 2012 pas besoin de ça, on doit  charger SQLPS)
+Add-PSSnapin SqlServerCmdLetSnapin100
+Add-PSSnapin SqlServerProviderSnapin100
+
+--Utiliser les commandes relatives au module SQL Server
+Get-Command –Module *SQL*
+Get-Command –Name *SQL*
+
+--Voir les propriétés d'un objet à partir de son type
+$message = "Hello World!"
+$message | Get-Member
+
+--Il existe une variable systeme pour Powershell: PSModulePath
+$env:PSModulePath
+
+   
+--Version de PowerShell
+$PSVersionTable
+
+--Changer de version
+Powershell.exe -Version 2
+
+--Liste des CmdLet avec le mot Log
+Get-Command -Name "*Log*"
+
+--Help (aide) sur un CmdLet
+Get-Help Get-Service
+
+--Exemples
+get-help Get-Service -examples
+
+--Simple requête
+sqlcmd -S localhost -d TV_ATOFFICE -U sa -P admin -Q "select getDate()" 
+Invoke-Sqlcmd -ServerInstance localhost -Database TV_ATOFFICE -Query "select GetDate()" 
+
+--Lecteur sur le PC
+Get-PSDrive
+
+--Allez voir dans le registre les infos liées à Sql Server
+cd "HKLM:\Software\Microsoft\Microsoft SQl Server"
+
+--Afficher tous les cmdlet qui commence par Get-
+Get-Command | Where-Object {$_.Name -like "Get-*"}
+
+--Affiche les cmdlet qui commence par Format- 
+Get-Command Format-*
+
+--Affiche les service qui concomme plus de 50 Mb sur le PC en les formatant sous forme de liste
+Get-Process | Where-Object {$_.PrivateMemorySize -gt 50MB} | SELECT ProcessName, PrivateMemorySize, CPU | Format-List
+
+--Exporter sur fichier CSV les servies qui consomme pmlus de 50 Mb sur le PC
+Get-Process | Where-Object {$_.PrivateMemorySize -gt 50MB} | SELECT ProcessName, PrivateMemorySize, CPU | Export-CSV c:\process.csv
+
+--Membres du cmdlet Get-Command
+Get-Command | Get-Member
+
+--Executer .ps1 - cganger la politiique de sécurité pour cela
+Set-executionPolicy RemoteSigned
+
+--Redemaret le service SQL Server san connaitre le nom de l'instance complete
+Get-Service | Where-Object {$_.Name -like "MSSQL$*"} | ReStart-Service -Force
+
+--Service qui consome plus de 50 Mb sur le PC (gt->Greater Than, lt->Less Than, le->Less or Equal) 
+Get-Process | Where-Object {$_.PrivateMemorySize -gt 50MB}
+
+--Se deplacer dansles dossier
+Set-Location SQLSERVER:\SQL\localhost
+
+--Ecrire sur l'ecran, manipuler une variable, ouvrir une Alert()
+param ( [string] $You = $(read-host "Enter your first name") ) 
+write-host "$You so totally rocks"
+
+--Créé une variable avec la date du jour, créé tableau de valeur et affiche les données su tableau
+--$_ et une variable qui renvoie le dernier objet manipulé
+$currdate = (Get-Date -Format "yyyyMMdd hhmmtt")
+$servers = @("ROGUE", "CEREBRO")
+$servers | ForEach-Object {Write-Host $currdate $_}
+
+
+--remonter d'un cran le chemin  
+cd ..
+cd DEFAULT                -- entrée dans le dossier DEFAULT
+$PWD                      -- afficher l'emplacement dans lequel nous sommes
+ls                        -- afficher la liste des dossier
+--Connaitre l'emplacement
+$PWD
+
+
+-- Sortir la liste des services avec le mot SQL et la trier
+Get-Service -name "*SQL*" | Select-Object ServiceName, Status, DisplayName | Sort-Object Status -Descending
+
+
+-- List
+$lList = @("RAN_ATOFFICE", "NES_ATOFFICE", "NEO_ATOFFICE") 	# crée une liste
+Write-Host $lList[0]						# renvoie RAN_ATOFFICE
+ForEach {}
+
+-- Mettre le script dans un fichier nommé .ps1
+-- Executer à partir de PowerShell
+PS C:\> C:\Scripts\Get-RunningServices.ps1 -Base RAN_ATOFFICE
+
+-- Voir l'aide dans une Pop-Up
+Get-Help Get-ChildItem -ShowWindow
+-- Voir l'aide sur le site Microsoft
+Get-Help Get-ChildItem -Online
+
+---------------------------------------------------
+---------------------------------------------------
+-------------Exemples Codes------------------------
+---------------------------------------------------
+---------------------------------------------------
+
+-----Parametres du server
+$instance="localhost"
+$server=New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $instance
+$server | Select Name, Version, Status, ConnectionContext, ComputerNamePhysicalNetBios
+
+-----Infos sur lordinateur
+$instance="localhost"
+Get-WmiObject -Class Win32_ComputerSystem -ComputerName $instance
+Select-Object Name, Domain, NumberOfProcessors, NumberOfLogicalProcessors | Format-List
+
+-----Infos sur l'UC
+$instance="localhost"
+Get-WmiObject -Class Win32_Processor -ComputerName $instance | Measure-Object -Property LoadPercentage -Average
+
+-----Quel types de propriété en rapport avec la Memoire y a t'il d'accessible sur le serveur
+$instance="localhost"
+Get-WmiObject -Class Win32_OperatingSystem -ComputerName $instance | Get-Member -MemberType Property | Where-Object {$_.Name -like "*mem*"} | Select-Object Name
+
+-----Memoire de l'ordinateur, memoire libre, Taux de memoire utilisée
+$instance = "localhost"
+Get-WmiObject -Class Win32_OperatingSystem -ComputerName $instance | 
+Select-Object @{Name="TotalVisibleMemorySize (GB)";Expression={"{0:N1}" -f (($_.TotalVisibleMemorySize)/1024/1024)}}
+            , @{Name="FreePhysicalMemory (GB)";Expression={"{0:N1}" -f (($_.FreePhysicalMemory)/1024/1024)}}
+            , @{Name="MemoryUsage %";Expression={ "{0:N2}" -f ((($_.TotalVisibleMemorySize - $_.FreePhysicalMemory)*100)/ $_.TotalVisibleMemorySize) }} | 
+Format-List
+
+
+-------------------Administration de SQL Server---------
+-- A surveiller:
+--	Processeur usage
+--	Available disks and their usage
+--	Available memory and their usage
+--	Network
+
+-- Caracteristiques du server
+Get-WmiObject -Class Win32_ComputerSystem -ComputerName localhost | Select-Object Name,Domain,NumberOfProcessors,NumberOfLogicalProcessors |Format-List
+
+-- Nbre de processeurs en utilisation et Nbre de processus en cours
+Get-WmiObject -Class Win32_Processor -ComputerName localhost | Measure-Object -Property LoadPercentage –Average
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
