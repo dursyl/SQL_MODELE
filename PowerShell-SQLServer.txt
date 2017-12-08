@@ -1,5 +1,5 @@
 --------------------Premier pas-------
-    -- On  peut faire aussi comme Áa:
+    -- On  peut faire aussi comme ÔøΩa:
 	Import-Module SQLSERVER
         CD SQLSERVER:\sql\localhost\DEFAULT
 
@@ -7,40 +7,40 @@
     --Ces SnapIn doit exister si je veux utiliser SQLSERVER sur PowerShell
         Get-PSSnapin SqlServerCmdLetSnapin100
         Get-PSSnapin SqlServerProviderSnapin100
-    --Sinon il faut les ajouter   (sur 2012 pas besoin de Áa, on doit  charger SQLPS)
+    --Sinon il faut les ajouter   (sur 2012 pas besoin de ÔøΩa, on doit  charger SQLPS)
         Add-PSSnapin SqlServerCmdLetSnapin100
         Add-PSSnapin SqlServerProviderSnapin100
 
----------------------------------------   
+---------------------------------------
 
     --Se placer dans le serveur SQL
         Set-Location SQLSERVER:\SQL\localhost
 
-    --RequÍte
+    --RequÔøΩte
         Invoke-Sqlcmd -Query "SELECT DB_NAME() as [Database]"
-    
-    --RequÍte T-SQL
+
+    --RequÔøΩte T-SQL
         CD SQLSERVER:\sql\localhost\DEFAULT
         Invoke-sqlcmd -Database TV_ATOFFICE -Query "select * from USR" | Format-Table
-    
-    --RequÍte T-SQL - Sortie CSV
+
+    --RequÔøΩte T-SQL - Sortie CSV
         CD SQLSERVER:\sql\localhost\DEFAULT
         Invoke-sqlcmd -Database TV_ATOFFICE -Query "select * from USR" | Export-CSV c:\TV_USER.csv  -encoding "unicode"
-    
-    --CrÈer dossier
+
+    --CrÔøΩer dossier
         md c:\test
-    --crÈer fichier
+    --crÔøΩer fichier
         fsutil file createnew C:\test\mynewfile.txt 1000
-    
-    --Divers stats du serveur envoyÈes dans un fichier
+
+    --Divers stats du serveur envoyÔøΩes dans un fichier
         ipconfig /all >C:\test\tshoot.txt
         route print >C:\test\tshoot.txt
         hostname >C:\test\tshoot.txt
         net statistics workstation >C:\test\tshoot.txt
     --Ouverture fichier texte
-        notepad C:\test\tshoot.txt 
-    --Passer le noms de tables d'une base de donnÈes dans un fichier texte
-      --Lancer PowerShell en cliquant droit sur une Base de donnÈes (SSMS)
+        notepad C:\test\tshoot.txt
+    --Passer le noms de tables d'une base de donnÔøΩes dans un fichier texte
+      --Lancer PowerShell en cliquant droit sur une Base de donnÔøΩes (SSMS)
         dir -Name >C:\test\TableNes.txt
 
 
@@ -52,15 +52,15 @@
 -----------------------------------------------
 
 #https://www.mssqltips.com/sqlservertip/1745/using-powershell-with-sql-server-management-objects-smo/
---recuperer des scripts : https://github.com/MikeFal 
+--recuperer des scripts : https://github.com/MikeFal
 
 --PLusieurs lignes de commentaires
 <#
 #>
 
---Voir les Provider ‡ disposition (on doit voir SQLServer apparaitre dans la liste
+--Voir les Provider ÔøΩ disposition (on doit voir SQLServer apparaitre dans la liste
 Get-PSProvider
-   
+
 --Voir les DRIVE (connecteurs disque c:\ d:\)
 Get-PSDrive
 
@@ -69,27 +69,27 @@ Get-ChildItem
 
 --Si Dans Get-PSDrive: SQLSERVER apparait alors je peux naviguer dans SQL Server
   -- Si je fait "dir" ici alors j'ai tout le parametrage de mon serveur
-SQLSERVER:\SQL\DELLV-SD\Default 
+SQLSERVER:\SQL\DELLV-SD\Default
 
 --Ces SnapIn doit exister si je veux utiliser SQLSERVER sur PowerShell
 Get-PSSnapin SqlServerCmdLetSnapin100
 Get-PSSnapin SqlServerProviderSnapin100
---Sinon il faut les ajouter   (sur 2012 pas besoin de Áa, on doit  charger SQLPS)
+--Sinon il faut les ajouter   (sur 2012 pas besoin de ÔøΩa, on doit  charger SQLPS)
 Add-PSSnapin SqlServerCmdLetSnapin100
 Add-PSSnapin SqlServerProviderSnapin100
 
 --Utiliser les commandes relatives au module SQL Server
-Get-Command ñModule *SQL*
-Get-Command ñName *SQL*
+Get-Command ÔøΩModule *SQL*
+Get-Command ÔøΩName *SQL*
 
---Voir les propriÈtÈs d'un objet ‡ partir de son type
+--Voir les propriÔøΩtÔøΩs d'un objet ÔøΩ partir de son type
 $message = "Hello World!"
 $message | Get-Member
 
 --Il existe une variable systeme pour Powershell: PSModulePath
 $env:PSModulePath
 
-   
+
 --Version de PowerShell
 $PSVersionTable
 
@@ -105,20 +105,20 @@ Get-Help Get-Service
 --Exemples
 get-help Get-Service -examples
 
---Simple requÍte
-sqlcmd -S localhost -d TV_ATOFFICE -U sa -P admin -Q "select getDate()" 
-Invoke-Sqlcmd -ServerInstance localhost -Database TV_ATOFFICE -Query "select GetDate()" 
+--Simple requÔøΩte
+sqlcmd -S localhost -d TV_ATOFFICE -U sa -P admin -Q "select getDate()"
+Invoke-Sqlcmd -ServerInstance localhost -Database TV_ATOFFICE -Query "select GetDate()"
 
 --Lecteur sur le PC
 Get-PSDrive
 
---Allez voir dans le registre les infos liÈes ‡ Sql Server
+--Allez voir dans le registre les infos liÔøΩes ÔøΩ Sql Server
 cd "HKLM:\Software\Microsoft\Microsoft SQl Server"
 
 --Afficher tous les cmdlet qui commence par Get-
 Get-Command | Where-Object {$_.Name -like "Get-*"}
 
---Affiche les cmdlet qui commence par Format- 
+--Affiche les cmdlet qui commence par Format-
 Get-Command Format-*
 
 --Affiche les service qui concomme plus de 50 Mb sur le PC en les formatant sous forme de liste
@@ -130,32 +130,32 @@ Get-Process | Where-Object {$_.PrivateMemorySize -gt 50MB} | SELECT ProcessName,
 --Membres du cmdlet Get-Command
 Get-Command | Get-Member
 
---Executer .ps1 - cganger la politiique de sÈcuritÈ pour cela
+--Executer .ps1 - cganger la politiique de sÔøΩcuritÔøΩ pour cela
 Set-executionPolicy RemoteSigned
 
 --Redemaret le service SQL Server san connaitre le nom de l'instance complete
 Get-Service | Where-Object {$_.Name -like "MSSQL$*"} | ReStart-Service -Force
 
---Service qui consome plus de 50 Mb sur le PC (gt->Greater Than, lt->Less Than, le->Less or Equal) 
+--Service qui consome plus de 50 Mb sur le PC (gt->Greater Than, lt->Less Than, le->Less or Equal)
 Get-Process | Where-Object {$_.PrivateMemorySize -gt 50MB}
 
 --Se deplacer dansles dossier
 Set-Location SQLSERVER:\SQL\localhost
 
 --Ecrire sur l'ecran, manipuler une variable, ouvrir une Alert()
-param ( [string] $You = $(read-host "Enter your first name") ) 
+param ( [string] $You = $(read-host "Enter your first name") )
 write-host "$You so totally rocks"
 
---CrÈÈ une variable avec la date du jour, crÈÈ tableau de valeur et affiche les donnÈes su tableau
---$_ et une variable qui renvoie le dernier objet manipulÈ
+--CrÔøΩÔøΩ une variable avec la date du jour, crÔøΩÔøΩ tableau de valeur et affiche les donnÔøΩes su tableau
+--$_ et une variable qui renvoie le dernier objet manipulÔøΩ
 $currdate = (Get-Date -Format "yyyyMMdd hhmmtt")
 $servers = @("ROGUE", "CEREBRO")
 $servers | ForEach-Object {Write-Host $currdate $_}
 
 
---remonter d'un cran le chemin  
+--remonter d'un cran le chemin
 cd ..
-cd DEFAULT                -- entrÈe dans le dossier DEFAULT
+cd DEFAULT                -- entrÔøΩe dans le dossier DEFAULT
 $PWD                      -- afficher l'emplacement dans lequel nous sommes
 ls                        -- afficher la liste des dossier
 --Connaitre l'emplacement
@@ -167,12 +167,12 @@ Get-Service -name "*SQL*" | Select-Object ServiceName, Status, DisplayName | Sor
 
 
 -- List
-$lList = @("RAN_ATOFFICE", "NES_ATOFFICE", "NEO_ATOFFICE") 	# crÈe une liste
+$lList = @("RAN_ATOFFICE", "NES_ATOFFICE", "NEO_ATOFFICE") 	# crÔøΩe une liste
 Write-Host $lList[0]						# renvoie RAN_ATOFFICE
 ForEach {}
 
--- Mettre le script dans un fichier nommÈ .ps1
--- Executer ‡ partir de PowerShell
+-- Mettre le script dans un fichier nommÔøΩ .ps1
+-- Executer ÔøΩ partir de PowerShell
 PS C:\> C:\Scripts\Get-RunningServices.ps1 -Base RAN_ATOFFICE
 
 -- Voir l'aide dans une Pop-Up
@@ -200,16 +200,16 @@ Select-Object Name, Domain, NumberOfProcessors, NumberOfLogicalProcessors | Form
 $instance="localhost"
 Get-WmiObject -Class Win32_Processor -ComputerName $instance | Measure-Object -Property LoadPercentage -Average
 
------Quel types de propriÈtÈ en rapport avec la Memoire y a t'il d'accessible sur le serveur
+-----Quel types de propriÔøΩtÔøΩ en rapport avec la Memoire y a t'il d'accessible sur le serveur
 $instance="localhost"
 Get-WmiObject -Class Win32_OperatingSystem -ComputerName $instance | Get-Member -MemberType Property | Where-Object {$_.Name -like "*mem*"} | Select-Object Name
 
------Memoire de l'ordinateur, memoire libre, Taux de memoire utilisÈe
+-----Memoire de l'ordinateur, memoire libre, Taux de memoire utilisÔøΩe
 $instance = "localhost"
-Get-WmiObject -Class Win32_OperatingSystem -ComputerName $instance | 
+Get-WmiObject -Class Win32_OperatingSystem -ComputerName $instance |
 Select-Object @{Name="TotalVisibleMemorySize (GB)";Expression={"{0:N1}" -f (($_.TotalVisibleMemorySize)/1024/1024)}}
             , @{Name="FreePhysicalMemory (GB)";Expression={"{0:N1}" -f (($_.FreePhysicalMemory)/1024/1024)}}
-            , @{Name="MemoryUsage %";Expression={ "{0:N2}" -f ((($_.TotalVisibleMemorySize - $_.FreePhysicalMemory)*100)/ $_.TotalVisibleMemorySize) }} | 
+            , @{Name="MemoryUsage %";Expression={ "{0:N2}" -f ((($_.TotalVisibleMemorySize - $_.FreePhysicalMemory)*100)/ $_.TotalVisibleMemorySize) }} |
 Format-List
 
 
@@ -220,27 +220,210 @@ Format-List
 --	Available memory and their usage
 --	Network
 
+-- Fichier de param√®tres de PowerShell
+$profile
+
 -- Caracteristiques du server
 Get-WmiObject -Class Win32_ComputerSystem -ComputerName localhost | Select-Object Name,Domain,NumberOfProcessors,NumberOfLogicalProcessors |Format-List
 
 -- Nbre de processeurs en utilisation et Nbre de processus en cours
-Get-WmiObject -Class Win32_Processor -ComputerName localhost | Measure-Object -Property LoadPercentage ñAverage
+Get-WmiObject -Class Win32_Processor -ComputerName localhost | Measure-Object -Property LoadPercentage ÔøΩAverage
 
+-- Type de memoire sur lequel la class peut agir
+Get-WmiObject -Class Win32_OperatingSystem -ComputerName localhost | Get-Member -MemberType Property | Where-Object Name -Like "*Mem*" | Select-Object Name
 
+-- Utilisation de la memoire
+Get-WmiObject -Class Win32_OperatingSystem -ComputerName localhost
+| Select-Object   @{Name="TotalVisibleMemorySize (GB)"; Expression={"{0:N1}" -f (($_.TotalVisibleMemorySize)/1024/1024)}}
+		, @{Name="FreePhysicalMemory (GB)";Expression={"{0:N1}" -f (($_.FreePhysicalMemory)/1024/1024)}}
+		, @{Name="MemoryUsage %";Expression={ "{0:N2}" -f ((($_.TotalVisibleMemorySize - $_.FreePhysicalMemory)*100)/ $_.TotalVisibleMemorySize) }}
+| Format-List
 
+-- Disque durs - Utilisation
+#current server name
+$servername = "localhost"
+Get-WmiObject -Class Win32_LogicalDisk -ComputerName $servername | Select-Object @{Name="DeviceID";Expression={$_.DeviceID}}, @{Name="DriveType"; Expression={switch ($_.DriveType)
+    {
+        0 {"Unknown"}
+        1 {"No Root Directory"}
+        2 {"Removable Disk"}
+        3 {"Local Disk"}
+        4 {"Network Drive"}
+        5 {"Compact Disc"}
+        6 {"RAM Disk"}
+    }};
+}	, @{Name="Size (GB)";Expression={"{0:N1}" -f($_.Size/1GB)}}
+	, @{Name="Free Space (GB)";Expression={"{0:N1}" -f($_.FreeSpace/1GB)}}
+	, @{Name="Free Space (%)";Expression={if ($_.Size -gt 0) {"{0:P0}" -f($_.FreeSpace/$_.Size)} else {0}}}
+| Format-Table -AutoSize
 
+-- Disque dur local
+Get-WmiObject -Class Win32_LogicalDisk ÔøΩFilter "DriveType=3" -ComputerName localhost
 
+-- Caracteristiques r√©seau du PC
+Get-WmiObject -Class Win32_NetworkAdapterConfiguration -ComputerName localhost -Filter IPEnabled=True | Select-Object Description, DHCPEnabled, IPEnabled, IPAddress, MACAddress
 
+-- Caracteristiques du systeme local
+Get-WmiObject -Class Win32_OperatingSystem -ComputerName localhost | Select-Object CSName, Caption, ServicePackMajorVersion, ServicePackMinorVersion | Format-List
 
+-- Liste des mise √† jour du systeme
+Get-WmiObject -Class Win32_QuickFixEngineering -ComputerName localhost | Sort-Object -Property InstalledOn -Descending | Format-Table ‚ÄìAutoSize
 
+-- Liste des instances sur un server
+$managedComputer = New-Object "Microsoft.SqlServer.Management.Smo.Wmi.ManagedComputer" localhost
+$managedComputer.ServerInstances | Select-Object Name, State, ServerProtocols, Urn | Format-List
 
+-- Liste des services SQL SERVER
+$managedComputer = New-Object "Microsoft.SqlServer.Management.Smo.Wmi.ManagedComputer" localhost
+$managedComputer.Services | Select-Object Name, ServiceAccount, DisplayName | Format-Table -AutoSize
 
+-- Log - Afficher les 5 derni√®res infos
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" localhost
+$server.ReadErrorLog() | Select-Object LogDate, ProcessInfo, Text, HasErrors -Last 5 | Format-List
+-- Log suite - Liste des erreurs
+$server.ReadErrorLog() | Where-Object HasErrors -eq $true
 
+-- Propri√©t√©s de l'instance - Affichage sur ecran
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" localhost
+$server | Get-Member | Where-Object Name -ne "SystemMessages" | Where-Object MemberType -eq "Property" | Select-Object Name, @{Name="Value";Expression={$server.($_.Name)}} | Format-Table -AutoSize
 
+-- Propri√©t√©s de l'instance - Exportation dans fichier csv
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" localhost
+$folder = "C:\Temp_XE"
+$currdate = Get-Date -Format "yyyy-MM-dd_hmmtt"
+$filename = "localhost_$($currdate).csv"
+$fullpath = Join-Path $folder $filename
+$server | Get-Member | Where-Object Name -ne "SystemMessages" | Where-Object MemberType -eq "Property" | Select-Object Name, @{Name="Value";Expression={$server.($_.Name)}} | Export-Csv -Path $fullpath -NoTypeInformation
 
+-- Liste des actions qu'il est possible d'effectuer sur les services
+Get-Command -Name "*Service*" -CommandType "Cmdlet"
 
+-- Arreter et relancer le service Agrent SQl
+$servicename = "SQLSERVERAGENT"  #si pas instance par d√©faut alors nom d instance √† la suite: SQLAgent$MSSQLSERVER
+Stop-Service -Name $servicename
+Start-Service -Name $servicename
 
+-- Demmarer un service si il est arret√©
+$myService = "MonService"
+$etatService = (get-service | Where-Object {$_.name -eq $myService } | select Status | ft -HideTableHeader) | Out-String
+if ($etatService.trim() -eq "Stopped"){start-service -name $myService}
 
+-- Retrouver le nom d'un service
+Get-Service | Where-Object {$_.name -like "*SQL*"}
 
+-- Manipulation d'un objets
+$managedComputer = New-Object "Microsoft.SqlServer.Management.Smo.Wmi.ManagedComputer" "localhost"
+$sqlservice = $managedComputer.Services | Where-Object Name -EQ "SQLSERVERAGENT"
+$sqlservice.ServiceAccount
 
+-- On peut modifier les propri√©t√©s du servers
+-- Par exemple, changer le chemin de backup par d√©faut de l'instance
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" "localhost"
+$server.BackupDirectory			#Afficher la propri√©t√©
+$server.BackupDirectory = "c:\Data"	#Modifier la propri√©t√©
+$server.Alter()
 
+-- Voir la configuration du server SqlServer
+$server.Settings
+
+------- A la place de sp_configure
+--  Autoriser la reconfiguration du server
+$server.Configuration.XPCmdShellEnabled.ConfigValue = 1
+$server.Configuration.Alter()
+$server.Configuration.XPCmdShellEnabled
+
+-- REconfigurer le niveau d'audit
+$server.Settings.AuditLevel = [Microsoft.SqlServer.Management.Smo.AuditLevel]::All
+$server.Settings.Alter()
+
+--------------------Listing databases et Tables
+-- Appel de l'objet server
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+-- Gestion de la connexion - Utilisation de Credential
+$server.ConnectionContext.LoginSecure=$false;
+$credential = Get-Credential
+$server.ConnectionContext.set_Login($credential.UserName)
+$server.ConnectionContext.set_SecurePassword($credential.Password)
+-- Sinon on peut se connecter en passant les param√®tres de connexion
+$dataSource = "localhost"
+$username = "sa"
+$database = "RAN_ATOFFICE"
+$password = "admin"
+$connectionString = "Server=$dataSource;uid=$username;
+pwd=$password;Database=$database;Integrated Security=False"
+$connection = New-Object System.Data.SqlClient.SqlConnection
+$connection.ConnectionString = $connectionString
+
+-- Nombre de bases
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$server.databases.Count
+
+-- Liste de bases non syst√®me
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$server.Databases | Where-Object IsSystemObject -eq $false
+
+-- Informations √† propos des bases
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$result = @()		#cr√©ation d un tableau
+$server.Databases | Where-Object IsSystemObject -eq $false | ForEach-Object {
+	$db = $_
+	$object = [PSCustomObject] @{
+		Name = $db.Name
+		CreateDate = $db.CreateDate
+		RecoveryModel = $db.RecoveryModel
+		NumTables = $db.Tables.Count
+		NumUsers = $db.Users.Count
+		NumSP = $db.StoredProcedures.Count
+		NumUDF = $db.UserDefinedFunctions.Count
+		}
+	$result += $object
+}
+$result | Format-Table -AutoSize
+
+-- Toutes les propri√©t√©s de l'objet database de Server
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$server.Databases | Get-Member | Where-Object MemberType ‚Äìeq "Property"
+-- Toutes les m√©thodes
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$server.Databases | Get-Member | Where-Object MemberType ‚Äìeq "Method"
+
+-- Liste des FileGroup des bases
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$result = @()
+$server.Databases | Where-Object IsSystemObject -eq $false | ForEach-Object {
+	$db = $_
+	$db.FileGroups | ForEach-Object {
+		$fg = $_
+		$fg.Files | ForEach-Object {
+			$file = $_
+			$object = [PSCustomObject] @{
+				Database = $db.Name
+				FileGroup = $fg.Name
+				FileName = $file.FileName | Split-Path -Leaf
+				"Size(MB)" = "{0:N2}" -f ($file.Size/1024)
+				"UsedSpace(MB)" = "{0:N2}" -f ($file.UsedSpace/1MB)
+				}
+			$result += $object
+			}
+	}
+	} $result | Format-Table -AutoSize
+
+	-- Ajouter un FileGroup
+	$servername = "localhost"
+	$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+	$dbname = "TEST"
+	$db = $server.Database[$dbname]
+	$fg = New-Object "Microsoft.SqlServer.Management.Smo.Filegroup" $db, "FG1"
+	$fg.Create()
+	-- Ajouter un fichier
+	$datafile = New-Object "Microsoft.SqlServer.Management.Smo.DataFile" $fg, "data4"
+	$datafile.FileName = "C:\DATA\data4.ndf"
+	$datafile.Create()
+	-- Changer la taille d'un fichier
+	$db = $server.Databases[$dbname]
+	$fg = $db.FileGroups["FG1"]
+	$file = $fg.Files["data4"]
+	$file.Size = 2 * 1024 #2MB
+	$file.Alter()

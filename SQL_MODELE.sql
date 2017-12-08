@@ -41,6 +41,9 @@ USE BOU_EFORCE
 -- Liste de la planification de l'agent SQL SERVER
 	select * from msdb.dbo.sysschedules
 
+
+
+
 /*
 https://conseilit.wordpress.com/2009/08/20/taches-quotidiennes-du-dba-l%E2%80%99espace-libre-dans-les-bases-de-donnees/
 http://www.adminreseau.net/2009/07/01/5-taches-courantes-dadministration-de-sql-server-2005/
