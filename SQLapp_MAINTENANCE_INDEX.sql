@@ -112,6 +112,24 @@
 */
 
 
+
+-- Les Stats redondantes
+	WITH T0 AS
+	(
+	SELECT s.object_id, s.name AS STAT_NAME, i.name AS INDEX_NAME,
+		   CASE WHEN i.is_primary_key = 1 THEN 'PRIMAY KEY' WHEN i.is_unique_constraint = 1 THEN 'UNIQUE' END AS CONSTRAINT_TYPE
+		   , i.has_filter AS HAS_FILTER, 
+		   (SELECT TOP 1 c.name FROM   sys.stats_columns AS sc  JOIN sys.COLUMNS AS c ON sc.object_id = c.object_id AND sc.column_id = c.column_id
+			WHERE  s.object_id = sc.object_id AND  s.stats_id = sc.stats_id ORDER BY sc.stats_column_id) AS STAT_COLUMN,
+		   STUFF((SELECT ', ' + c.name FROM   sys.stats_columns AS sc JOIN sys.COLUMNS AS c ON sc.object_id = c.object_id AND sc.column_id = c.column_id
+				  WHERE  s.object_id = sc.object_id AND  s.stats_id = sc.stats_id ORDER BY sc.stats_column_id
+				  FOR XML PATH('')), 1, 1, '') AS KEY_COLS FROM   sys.stats AS s LEFT OUTER JOIN sys.indexes AS i ON s.object_id = i.object_id AND s.name = i.name)
+	SELECT A.*, B.STAT_NAME AS STAT_NAME2, B.INDEX_NAME AS INDEX_NAME2, B.CONSTRAINT_TYPE AS CONSTRAINT_TYPE2, B.HAS_FILTER AS HAS_FILTER2, B.KEY_COLS AS KEY_COLS2
+			, N'DROP STATISTICS [' + s.name + N'].[' + o.name + N'].[' + B.STAT_NAME + N'];' AS DROP_STAT
+	FROM   T0 AS A JOIN T0 AS B ON  A.STAT_COLUMN = B.STAT_COLUMN AND A.STAT_NAME = B.STAT_NAME AND A.object_id = B.object_id
+		   JOIN sys.objects AS o ON A.object_id = o.object_id JOIN sys.schemas AS s ON o.schema_id = s.schema_id                 
+	WHERE  B.INDEX_NAME IS NULL AND    o."type" IN ('V', 'U');
+
 	
 ------------------------------------------------------------------------------
 

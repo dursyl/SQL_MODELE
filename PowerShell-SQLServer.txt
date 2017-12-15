@@ -389,6 +389,7 @@ $server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
 $server.Databases | Get-Member | Where-Object MemberType –eq "Method"
 
 -- Liste des FileGroup des bases
+Import-Module sqlserver
 $servername = "localhost"
 $server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
 $result = @()
@@ -411,6 +412,7 @@ $server.Databases | Where-Object IsSystemObject -eq $false | ForEach-Object {
 	} $result | Format-Table -AutoSize
 
 	-- Ajouter un FileGroup
+	Import-Module sqlserver
 	$servername = "localhost"
 	$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
 	$dbname = "TEST"
@@ -427,3 +429,266 @@ $server.Databases | Where-Object IsSystemObject -eq $false | ForEach-Object {
 	$file = $fg.Files["data4"]
 	$file.Size = 2 * 1024 #2MB
 	$file.Alter()
+
+
+-----------------------------------PROCESSUS-------------
+-- Liste des processus non-systeme donc SQLSERVER
+Import-Module sqlserver
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$server.EnumProcesses() | Where-Object IsSystem -eq $false | Select-Object Spid, Database, IsSystem, Login, Status, Cpu, MemUsage, Program | Format-Table -AutoSize
+-- Pareil avec un order by DESC sur la consommation CPU
+$server.EnumProcesses() | Where-Object IsSystem -eq $false | Select-Object Spid, Database, IsSystem, Login, Status, Cpu, MemUsage, Program | Sort-Object Cpu -descending | Format-Table -AutoSize
+-- Pareil avec deux clause Where dont une sur la BDD
+$server.EnumProcesses() | Where-Object {$_.IsSystem -eq $false -and $_.Database -eq "NEO_ATOFFICE"} | Select-Object Spid, Database, IsSystem, Login, Status, Cpu, MemUsage, Program | Sort-Object Cpu -descending | Format-Table -AutoSize
+-- Arreter un PROCESSUS
+$blockingSpid = 56
+$server.KillProcess($blockingSpid)
+-- Arreter tous les processus d'une base de données
+$dbname = "RAN_ATOFFICE"
+$server.KillAllProcesses($dbname)
+
+----------------------------------Servers Features
+-- Liste des accessoire (AlwaysOne, FileStream, Cluster, FullText, etc.)
+Import-Module sqlserver
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$server | Select-Object IsClustered, ClusterName, FilestreamLevel, IsFullTextInstalled, LinkedServers, IsHadrEnabled, AvailabilityGroups
+
+----------------------------------Script des objets SQL SERVER
+Import-Module sqlserver
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+$db = $server.Databases[$dbname]
+$script = New-Object "Microsoft.SqlServer.Management.Smo.Scripter" $server
+$scriptOptions = New-Object "Microsoft.SqlServer.Management.Smo.ScriptingOptions"
+$scriptOptions.AllowSystemObjects = $false
+$scriptOptions.DriAll = $true
+$scriptOptions.ToFileOnly = $true
+$script.Options = $scriptOptions
+$smoObjects = @()
+$filename = "C:\temp_XE\$($dbname)_tables_export.sql"
+$script.Options.FileName = $filename
+$db.Tables | Where-Object IsSystemObject -eq $false | Foreach-Object {$smoObjects += $_}  #pour les procedures : $db.StoredProcedures
+$script.Script($smoObjects)
+
+-- Transferer les objets d'une base à une autre (script ou Data) - ScriptTransfer(), TransferData()
+-- Voir http://msdn.microsoft.com/en-us/library/microsoft.sqlserver.management.smo.transfer.aspx
+Import-Module sqlserver
+$servername = "localhost"
+$srv = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+$db = $srv.Databases[$dbname]
+--Création d'une nouvelle base
+$dbCopy = New-Object -TypeName Microsoft.SqlServer.Management.SMO.Database -argumentlist $srv, "RAN_ATOFFICE_COPY"
+$dbCopy.Create()
+-- Objet transfert et otpions
+$xfr = New-Object -TypeName Microsoft.SqlServer.Management.SMO.Transfer -ArgumentList $db
+$xfr.CopyAllTables = $true
+$xfr.Options.WithDependencies = $true
+$xfr.Options.ContinueScriptingOnError = $true
+$xfr.DestinationDatabase = "RAN_ATOFFICE_COPY"
+$xfr.DestinationServer = $srv.Name
+$xfr.DestinationLoginSecure = $true
+$xfr.CopySchema = $true
+"Scripting Data Transfer"
+#Script the transfer. Alternatively perform immediate data transfer with TransferData method.
+$xfr.ScriptTransfer() #TransferData()
+
+-----------------------------Création d'une base  de données
+$dbCopy = New-Object -TypeName Microsoft.SqlServer.Management.SMO.Database -argumentlist $srv, "AdventureWorksCopy"
+$dbCopy.Create()
+
+-----------------------------Détachement de base de données
+Import-Module sqlserver
+$servername = "localhost"
+$sourceserver = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+#$sourceserver | Get-Member | Where-Object MemberType –eq "Method"
+#$sourceserver.EnumDetachedDatabaseFiles($mdf)
+#$sourceserver.EnumDetachedLogFiles($mdf)
+$sourceserver.DetachDatabase($dbname, $true, $true)
+-----------------------------Attachement de base de données
+Import-Module SQLSERVER -DisableNameChecking
+$destinationname = "localhost"
+$destinationserver = New-Object "Microsoft.SqlServer.Management.Smo.Server" $destinationname
+#$destinationserver.Name
+$dbname = "RAN_ATOFFICE"
+$mdf = "C:\DATA\DATA RANBAXY\RAN_ATOFFICE.mdf"
+#this is where we will store all primary, secondary and log file information
+$files = New-Object System.Collections.Specialized.StringCollection
+#assuming we need the attach process to point to a different path than what s stored in the mdf
+#we can specify a data path, and rebuild all the paths before we store in our collection
+$datapath = "C:\DATA\DATA RANBAXY"
+#collect all data file information
+$sourceserver.EnumDetachedDatabaseFiles($mdf) | ForEach-Object { #update location of file to new path
+$newfile = Join-Path $datapath (Split-Path $_ -Leaf)
+$files.Add($newfile)
+}
+#collect all log file information
+$destinationserver.EnumDetachedLogFiles($mdf) | ForEach-Object { #update location of file to new path
+$newfile = Join-Path $datapath (Split-Path $_ -Leaf)
+$files.Add($newfile)
+}
+$destinationserver.AttachDatabase($dbname, $files)
+
+
+-- Information sur les fichiers d'une base de données
+$srv = new-Object Microsoft.SqlServer.Management.Smo.Server("(local)")
+$db = New-Object Microsoft.SqlServer.Management.Smo.Database
+$db = $srv.Databases.Item("RAN_ATOFFICE")
+#$db | Get-Member -MemberType Property | Where-Object {$_.Name -like "*file*"}
+Foreach ($lf in $db.LogFiles)
+{
+   Write-Host "     [LOG] Fichier:"$lf.FileName, " Taille:"$lf.Length, " Nom:"$lf.Name
+}
+Foreach ($fg in $db.FileGroups)
+{
+    #$fg | Get-Member -MemberType Property
+   Write-Host "     [DATA] Fichier:"$fg.Files, " Taille:"$fg.Length, " Nom:"$fg.Name
+   Foreach ($f in $fg.Files){Write-Host "          [FICHIER] Nom:" $f.name, " Fichier:"$f.FileName, " Taille:"$f.Size}
+}
+
+
+-- Connaitre les méthodes d'un objet
+$sourceserver | Get-Member | Where-Object MemberType –eq "Method"
+-- Connaitre les propriétés d'un objet
+$sourceserver | Get-Member | Where-Object MemberType –eq "Property"
+
+
+------------------------------------BACKUP-------------
+--Options à disposition
+Get-Help Backup-SqlDatabase
+-- BACKUP complete
+Import-Module sqlserver
+$servername = "localhost"
+#$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+$currdate = Get-Date -Format yyyyMMddHHmmss
+$backupfolder = "C:\DATA\BKP"
+#generate backup file path and name
+$fullbackupfilename = "$($dbname)_Full_$($currdate).bak"
+$fullbackupfile = Join-Path $backupfolder $fullbackupfilename
+#example filename that gets generated is: C:\DATA\BKP\Chinook_Full_20141023235306.bak
+Backup-SqlDatabase -ServerInstance $servername -Database $dbname -BackupFile $fullbackupfile -Checksum -Initialize -BackupSetName "$dbname Full Backup"
+Write-Output "Database has been backed up $fullbackupfile"
+
+-- BackUp differentielle
+Import-Module sqlserver
+$servername = "localhost"
+$dbname = "RAN_ATOFFICE"
+$currdate = Get-Date -Format yyyyMMddHHmmss
+$backupfolder = "C:\DATA\BKP"
+$diffbackupfilename = "$($dbname)_Diff_$($currdate).bak"
+$diffbackupfile = Join-Path $backupfolder $diffbackupfilename
+Backup-SqlDatabase -ServerInstance $servername -Database $dbname -BackupFile $diffbackupfile -Incremental -Checksum -Initialize -BackupSetName "$dbname Diff Backup"
+Write-Output "Database has been backed up $diffbackupfile"
+
+--BackUp de journal de transactions
+Import-Module sqlserver
+$servername = "localhost"
+$dbname = "RAN_ATOFFICE"
+$currdate = Get-Date -Format yyyyMMddHHmmss
+$backupfolder = "C:\DATA\BKP"
+$logbackupfilename = "$($dbname)_Log_$($currdate).trn"
+$logbackupfile = Join-Path $backupfolder $logbackupfilename
+Backup-SqlDatabase -ServerInstance $servername -Database $dbname -BackupFile $logbackupfile -BackupAction Log -Checksum -Initialize -BackupSetName "$dbname Txn Backup"
+# on veut juste connaitre le script:
+#Backup-SqlDatabase -ServerInstance $servername -Database $dbname -BackupFile $logbackupfile -BackupAction Log -Checksum -Initialize -BackupSetName "$dbname Txn Backup" -Script
+Write-Output "Database has been backed up $logbackupfile"
+
+-- Lire les fichier de BackUp
+Import-Module sqlserver
+#current server name
+$servername = "localhost"
+#$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+$restore = New-Object "Microsoft.SqlServer.Management.Smo.Restore"
+$backupfile = "C:\DATA\BKP\RAN_ATOFFICE_Log_20171214115050.trn"
+$restore.Devices.AddDevice($backupfile,[Microsoft.SqlServer.Management.Smo.DeviceType]::File)
+$restore.ReadFileList($server) | Select Type, LogicalName, PhysicalName, FileGroupName, Size
+$restore.ReadBackupHeader($server)
+$restore.ReadMediaHeader($server)
+
+----------------------------Restore
+--Options à disposition
+Get-Help Restore-SqlDatabase
+
+-- Mettre la base en SINGLE USER
+$srv = new-Object Microsoft.SqlServer.Management.Smo.Server("(local)")
+$db = New-Object Microsoft.SqlServer.Management.Smo.Database
+$db = $srv.Databases.Item("RAN_ATOFFICE")
+$db.useraccess = "Single"
+#$db.DatabaseUserAccess = "Multiple"
+$db.alter()
+
+
+
+-- Restore de FULL, puis de DIFF et enfin des LOG. NORECOVERY pour les deux premiers
+Import-Module sqlserver
+#current server name
+$servername = "localhost"
+$backupfile = "C:\DATA\BKP\RAN_ATOFFICE_Full_20171214114750.bak"
+Restore-SqlDatabase -Database $dbname -ReplaceDatabase -ServerInstance $servername -BackupFile $backupfile -NoRecovery
+
+$backupfile = "C:\DATA\BKP\RAN_ATOFFICE_Diff_20171214115028.bak"
+Restore-SqlDatabase -Database $dbname -ReplaceDatabase -ServerInstance$servername -BackupFile $backupfile -NoRecovery
+
+$backupfile = "C:\DATA\BKP\RAN_ATOFFICE_Log_20171214115050.trn"
+Restore-SqlDatabase -Database $dbname -ReplaceDatabase -ServerInstance $servername -BackupFile $backupfile
+-ToPointInTime "2017-13-14 10:58:42"
+
+----------------------------- INDEX --------------
+-- Information sur les index: Type, Nbre pages, Taux de fragmentation, espace utilisé
+Import-Module SQLSERVER
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "NEO_ATOFFICE"
+$result = @()
+$db = $server.Databases[$dbname]
+$db.Tables | ForEach-Object {
+    $table = $_
+    $table.Indexes | Sort-Object -Property Name | ForEach-Object {
+        $index = $_
+        $frag = $index.EnumFragmentation()
+        $object = [PSCustomObject] @{
+            Table = $table.Name
+            Index = $index.Name
+            Type = $frag.IndexType
+            Pages = $frag.Pages
+            "AvgFragmentation %" = "{0:N2}" -f ($frag.AverageFragmentation)
+            "SpaceUsed(KB)" = $index.SpaceUsed
+            }
+        $result += $object
+        }
+    }
+$result | Format-Table
+
+-- Reorganisation et reconstruction d'index en fonction de leurs fragmentation
+-- fragmentation entre 10 et 30 plus de 1000 pages
+Import-Module SQLSERVER
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "NEO_ATOFFICE"
+$result = @()
+$db = $server.Databases[$dbname]
+$db.Tables | ForEach-Object {
+    $table = $_
+    $table.Indexes | Sort-Object -Property Name | ForEach-Object {
+        $index = $_
+        $indexFrag = $index.EnumFragmentation()
+            #$indexFrag is an object resulting from EnumFragmentation()
+            if ($indexFrag.AverageFragmentation -ge 10 -and $indexFrag.AverageFragmentation -le 30 -and $indexFrag.Pages -ge 1000)
+            {
+                $index.Reorganize()
+            }
+            elseif ($indexFrag.AverageFragmentation -ge 30 -and
+            $indexFrag.Pages -ge 1000)
+            {
+                $index.Rebuild()
+            }            }
+    }
+$result | Format-Table
+
+	p100

@@ -93,7 +93,57 @@
 */
 	select * from sys.dm_db_mirroring_auto_page_repair
 
+
+/*
+	Metrique des données - Procédure
+		Les métriques fournies par cette procédure sont les suivantes :
+			BASE_TAILLE_MO : taille globale de la base y compris transactions
+			DONNEES_RESERVE_MO : taille réservée pour les données de la base
+			DONNEES_UTILISEES_MO : volume effectif des données de la base (tables et index)
+			DONNEES_UTILISEES_POURCENT : taux de remplissage des données dans les fichiers de la base
+			TABLES_MO : volume des données des tables (à titre indicatif)
+			INDEX_MO : volume des index (à titre indicatif)
+			TABLES_POURCENT : proportion du volume des tables en % (à titre indicatif)
+			INDEX_POURCENT : proportion du volume des index en % (à titre indicatif)
+			TRANSACTIONS_RESERVEES_MO : taille réservée pour le journal de transaction de la base
+			TRANSACTIONS_UTILISEES_MO : volume effectif des transactions de la base
+			TRANSACTIONS_UTILISEES_POURCENT : taux de remplissage des transactions dans les fichiers de la base
 	
+		Les deux métriques les plus importantes sont : DONNEES_UTILISEES_POURCENT et TRANSACTIONS_UTILISEES_POURCENT
+			C’est sur celles-ci qu’il faut réagir au plus vite en redimensionnant les fichiers ou en rajoutant de nouveaux fichiers…
+			Il est d’usage de se poser des questions lorsque les taux de remplissage dépasse 70%, de planifier la croissance à 80 et d’agir impérativement à 90%.			
+*/
+USE master;
+GO
+CREATE PROCEDURE dbo.sp__METRIQUE_STOCKAGE @REAJUSTE BIT = 0 AS
+SET NOCOUNT ON;
+IF @REAJUSTE = 1 --> réajustement des statistiques des espaces de stockage
+   DBCC UPDATEUSAGE (0); --> volume des transactions
+DECLARE @T TABLE (database_name sysname, log_size_mb FLOAT, log_space_used_percent FLOAT, STATUS bit);
+DECLARE @TRANSACTIONS_RESERVEES_MO BIGINT, @TRANSACTIONS_UTILISEES_MO BIGINT, @TRANSACTIONS_UTILISEES_POURCENT DECIMAL(5,2);
+INSERT INTO @T
+EXEC ('DBCC SQLPERF(LOGSPACE)')
+SELECT @TRANSACTIONS_RESERVEES_MO = ROUND(log_size_mb, 0), @TRANSACTIONS_UTILISEES_MO = ROUND(log_size_mb * log_space_used_percent / 100.0, 0)
+       , @TRANSACTIONS_UTILISEES_POURCENT = CAST(log_space_used_percent AS DECIMAL(5,2)) FROM @T WHERE database_name = DB_NAME(); -- taille de l'enveloppe de stockage :
+	WITH 
+	T_FILES AS (SELECT CAST(ROUND(SUM(CASE WHEN "type" = 1 THEN SIZE ELSE 0 END) / 128.0, 0) AS BIGINT) AS TRANSACTIONS_RESERVEES_MO
+		   , CAST(ROUND(SUM(CASE WHEN "type" != 1 THEN SIZE ELSE 0 END) / 128.0, 0) AS BIGINT) AS DONNEES_RESERVE_MO
+	FROM   sys.database_files),	T_DB AS (SELECT TRANSACTIONS_RESERVEES_MO + DONNEES_RESERVE_MO AS BASE_TAILLE_MO, DONNEES_RESERVE_MO, TRANSACTIONS_RESERVEES_MO
+											FROM   T_FILES), T_PAGES AS (-- taille des pages données et index           
+	SELECT CAST(ROUND(SUM(au.used_pages) / 128.0, 0) AS BIGINT) AS DONNEES_UTILISEES_MO,
+		   CAST(ROUND(SUM(CASE WHEN it.internal_type IN (202, 204, 211, 212, 213, 214, 215, 216) THEN 0 WHEN au.TYPE != 1 THEN au.used_pages WHEN p.index_id < 2  
+								THEN au.data_pages ELSE 0 END) / 128.0, 0) AS BIGINT) AS TABLES_MO
+	FROM   sys.partitions AS p INNER JOIN sys.allocation_units au ON p.partition_id = au.container_id LEFT OUTER JOIN sys.internal_tables AS it ON p.object_id = it.object_id)
+	SELECT BASE_TAILLE_MO, DONNEES_RESERVE_MO, DONNEES_UTILISEES_MO, CAST(100.0 * CAST( DONNEES_UTILISEES_MO AS FLOAT) / DONNEES_RESERVE_MO AS DECIMAL(5,2)) AS DONNEES_UTILISEES_POURCENT
+		   , TABLES_MO, DONNEES_UTILISEES_MO - TABLES_MO AS INDEX_MO, CAST(100.0 * CAST( TABLES_MO AS FLOAT) / DONNEES_UTILISEES_MO AS DECIMAL(5,2)) AS TABLES_POURCENT 
+		   , CAST(100.0 * CAST( DONNEES_UTILISEES_MO - TABLES_MO AS FLOAT) / DONNEES_UTILISEES_MO AS DECIMAL(5,2)) AS INDEX_POURCENT, TRANSACTIONS_RESERVEES_MO
+		   , @TRANSACTIONS_UTILISEES_MO AS TRANSACTIONS_UTILISEES_MO, @TRANSACTIONS_UTILISEES_POURCENT AS TRANSACTIONS_UTILISEES_POURCENT
+	FROM   T_PAGES CROSS JOIN  T_DB;
+	GO
+-- Rendre la procédure système accessible à partir de toutes bases
+	EXEC sp_MS_marksystemobject 'sp__METRIQUE_STOCKAGE';
+	GO	
+	EXEC sp__METRIQUE_STOCKAGE
 	
 ------------------------------------------------------------------------------
 select * from sys.messages where language_id=1036 and message_id=8992
@@ -110,3 +160,6 @@ select OBJECT_NAME(10)
 select OBJECT_ID('USR')
 select * from BOU_EFORCE.dbo.PORT
 SELECT DISTINCT OBJECT_NAME(3) FROM RAN_ATOFFICE
+
+
+

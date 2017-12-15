@@ -187,3 +187,80 @@ exec sp_updatestats --A ne pas utiliser tel quel. Elle recalcule tout alors qu'i
 -- Connaitre les droits attribuables à un objet 
 		SELECT * FROM sys.fn_builtin_permissions(DEFAULT);
 		SELECT * FROM sys.fn_builtin_permissions('SERVER');
+
+
+
+
+------------------------------------------------- base de données mal parametrée au niveau fichier
+DBCC UPDATEUSAGE (0);
+DECLARE @T TABLE (database_name sysname, LOG_SIZE_MB FLOAT, LOG_SPACE_USER_PERCENT FLOAT, STATUS BIT)
+INSERT INTO @T EXEC ('DBCC SQLPERF(LOGSPACE)');
+WITH T0 AS 
+(SELECT create_date AS DATE_CREATION, GETDATE() AS ACTUAL_DATE, fg.name AS STORAGE_NAME, f.name AS FILE_NAME, fg.data_space_id AS SPACE_ID, f.type_desc AS STORAGE_TYPE
+		   , SIZE / 128.0 AS SIZE_MB, CASE is_percent_growth WHEN 0 THEN growth / 128.0 WHEN 1 THEN NULL END AS SIZE_INCREMENT_MB
+		   , CASE is_percent_growth WHEN 0 THEN NULL WHEN 1 THEN growth END AS PERCENT_INCREMENT
+		   , SUM(a.total_pages) / 128.0 AS TOTAL_RESERVED_MB, SUM(a.used_pages) / 128.0 AS TOTAL_USED_MB
+		   , SIZE / 128.0 / (SUM(a.used_pages) / NULLIF(DATEDIFF(YEAR, create_date, GETDATE()), 0)) AS YEAR_SPACE
+	FROM   sys.DATABASES AS d CROSS JOIN  sys.database_files AS f FULL OUTER JOIN sys.filegroups AS fg ON f.data_space_id = fg.data_space_id
+		   LEFT OUTER JOIN sys.allocation_units AS a ON fg.data_space_id = a.data_space_id
+	WHERE  d.database_id = DB_ID()
+	GROUP  BY create_date, fg.name, f.name, fg.data_space_id, f.type_desc, SIZE, growth, is_percent_growth)
+, T_EQ AS (SELECT COUNT(*) AS NOMBRE, STORAGE_NAME FROM   T0 GROUP  BY STORAGE_NAME, SIZE_MB EXCEPT
+ SELECT COUNT(*) AS NOMBRE, STORAGE_NAME FROM T0 GROUP  BY STORAGE_NAME)
+, T_PC AS (SELECT FILE_NAME FROM   T0 WHERE  PERCENT_INCREMENT IS NOT NULL)
+, T_IF AS (SELECT FILE_NAME, CASE WHEN YEAR_SPACE < 0.25 THEN '3 mois' WHEN YEAR_SPACE < 0.5  THEN '6 mois' WHEN YEAR_SPACE < 1 THEN '1 an' WHEN YEAR_SPACE < 2 THEN '2 ans' END AS RESERVATION
+  FROM T0 WHERE  YEAR_SPACE < 2)
+, T_IC AS (SELECT FILE_NAME FROM T0 WHERE  COALESCE(SIZE_INCREMENT_MB, (SIZE_MB * PERCENT_INCREMENT) / 100.0) < YEAR_SPACE / 1461)
+, T_FT AS (SELECT LOG_SIZE_MB, LOG_SPACE_USER_PERCENT FROM T0 CROSS JOIN @T WHERE  STORAGE_TYPE = 'ROWS' AND database_name = DB_NAME()
+		GROUP  BY LOG_SIZE_MB, LOG_SPACE_USER_PERCENT, database_name HAVING  SUM(SIZE_MB) / LOG_SIZE_MB < 10) 
+SELECT 'FICHIERS NON ÉQUILIBRÉ dans le groupe de fichier ' + STORAGE_NAME AS DANGER FROM T_EQ
+UNION ALL
+SELECT 'INCRÉMENT EN POURCENTAGE pour le fichier ' + FILE_NAME AS DANGER FROM T_PC
+UNION ALL
+SELECT 'RÉSERVE D''ESPACE DE STOCKAGE INSUFFISANTE (moins de ' + RESERVATION + ') pour le fichier ' + FILE_NAME AS DANGER FROM T_IF
+UNION ALL
+SELECT 'INCRÉMENT DE FICHIER TROP FAIBLE pour le fichier ' + FILE_NAME FROM   T_IC
+UNION ALL
+SELECT 'JOURNAL DE TRANSACTION INSUFFISAMENT DIMENSIONNÉ : taille : ' + CAST(LOG_SIZE_MB AS VARCHAR(32)) + ' Mo, remplissage : ' + CAST(LOG_SPACE_USER_PERCENT AS VARCHAR(32)) + '%.'
+FROM   T_FT;
+
+
+--------------------------- Il y a des tables obeses dans la base de données
+SELECT T.TABLE_SCHEMA, T.TABLE_NAME, COUNT(*) AS NOMBRE_COLONNES,
+       CASE WHEN COUNT(*) > 160 THEN 'ATTERANT' WHEN COUNT(*) > 80 THEN 'HORRIBLE' WHEN COUNT(*) > 40 THEN 'DÉGUEULASSE' ELSE 'MAUVAIS' END           
+FROM   INFORMATION_SCHEMA.COLUMNS AS C INNER JOIN INFORMATION_SCHEMA.TABLES AS T ON C.TABLE_SCHEMA = T.TABLE_SCHEMA  AND C.TABLE_NAME = T.TABLE_NAME
+WHERE  TABLE_TYPE = 'BASE TABLE' GROUP  BY T.TABLE_SCHEMA, T.TABLE_NAME HAVING COUNT(*) > 20;
+
+------------------------- Utilisation des contraintes
+WITH
+TT AS (SELECT CAST(COUNT(*) AS FLOAT) AS NOMBRE_TABLE FROM   sys.objects WHERE  "TYPE" = 'U')
+, TC AS (SELECT CAST(COUNT(*) AS FLOAT) AS NOMBRE_COLONNE FROM   INFORMATION_SCHEMA.COLUMNS AS C
+       INNER JOIN INFORMATION_SCHEMA.TABLES AS T ON C.TABLE_SCHEMA = T.TABLE_SCHEMA  AND C.TABLE_NAME = T.TABLE_NAME
+	WHERE  TABLE_TYPE = 'BASE TABLE')
+, TCK AS(SELECT SUM(NOMBRE_CHECK) AS NOMBRE_CHECK FROM (SELECT CAST(COUNT(*) AS FLOAT) AS NOMBRE_CHECK FROM   sys.objects WHERE  "TYPE" = 'C'
+			UNION ALL 
+         SELECT COUNT(*) FROM sys.COLUMNS AS c INNER JOIN sys.types AS t ON c.user_type_id = t.user_type_id INNER JOIN sys.objects AS r ON t.rule_object_id = r.object_id) AS T_CHEK)
+, TFK AS(SELECT DISTINCT CAST(COUNT(object_id) OVER() AS FLOAT) AS NOMBRE_FK FROM sys.objects WHERE "TYPE" = 'F')
+, T AS(SELECT NOMBRE_TABLE, (NOMBRE_CHECK / NOMBRE_COLONNE) * 100 AS RATIO_CHECK, (NOMBRE_FK/ NOMBRE_TABLE) * 100 AS RATIO_FK FROM   TT
+       OUTER APPLY TC OUTER APPLY TCK OUTER APPLY TFK)
+SELECT NOMBRE_TABLE, RATIO_CHECK, CASE WHEN RATIO_CHECK > 80 THEN 'excellent' WHEN RATIO_CHECK > 40 THEN 'bien' WHEN RATIO_CHECK > 20 THEN 'correct'
+		WHEN RATIO_CHECK > 10 THEN 'faible' WHEN RATIO_CHECK >= 5 THEN 'insignifiant' WHEN RATIO_CHECK = 100 THEN 'excellent'
+		WHEN RATIO_FK > 80 THEN 'bien' WHEN RATIO_FK > 60 THEN 'correct' WHEN RATIO_FK > 40 THEN 'faible' WHEN RATIO_FK >= 20 THEN 'insignifiant'
+        WHEN RATIO_FK < 20 THEN 'mauvais' ELSE 'nul !' END AS RATIO_FK_QUALITY                        
+FROM T;
+
+--- Liste des bases et focus sur leurs paramétrages à propos des statistiques
+select is_auto_update_stats_async_on,is_auto_update_stats_on, is_auto_create_stats_on,* from sys.databases
+
+-- Combien de pages ont changées depuis la dernière sauvegarde complete. Utile pour voir à quelle vitesse il faut faire des sauvegardes -- Depuis sqlserver 2017
+select CAST(ROUND((modified_extent_page_count*100.0)/allocated_extent_page_count,2) as decimal(6,2)) AS 'DiffChangePct' ,modified_extent_page_count ,allocated_extent_page_count 
+from sys.dm_db_file_space_usage GO
+
+
+/*
+https://blogs.technet.microsoft.com
+https://www.mssqltips.com/sqlservertip
+https://www.databasejournal.com
+https://akawn.com/blog
+http://www.sqlservergeeks.com
+*/
