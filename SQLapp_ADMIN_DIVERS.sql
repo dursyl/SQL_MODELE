@@ -192,6 +192,7 @@ exec sp_updatestats --A ne pas utiliser tel quel. Elle recalcule tout alors qu'i
 
 
 ------------------------------------------------- base de données mal parametrée au niveau fichier
+-- Alerte les systèmes de fichiers mal paramétrés BDD
 DBCC UPDATEUSAGE (0);
 DECLARE @T TABLE (database_name sysname, LOG_SIZE_MB FLOAT, LOG_SPACE_USER_PERCENT FLOAT, STATUS BIT)
 INSERT INTO @T EXEC ('DBCC SQLPERF(LOGSPACE)');

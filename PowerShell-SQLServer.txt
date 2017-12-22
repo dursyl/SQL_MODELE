@@ -691,4 +691,289 @@ $db.Tables | ForEach-Object {
     }
 $result | Format-Table
 
-	p100
+---------------------- USERS, LOGINS
+-- Liste des LOGINS
+Import-Module SQLSERVER
+$server = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$result = @()
+# Si je veux connaitre les propriétés de Login
+# $server.Logins | Get-Member -MemberType Property
+$server.Logins | Where-Object IsSystemObject -EQ $false | ForEach-Object {
+	$login = $_
+	$object = [pscustomobject] @{
+		Login = $login.Name
+		LoginType = $login.LoginType
+		CreateDate = $login.CreateDate
+		ServerRoles = $login.ListMembers()
+		}
+		$result += $object
+	}
+$result | Format-Table -AutoSize
+
+-- Liste des users des bases
+Import-Module SQLSERVER
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$result = @()
+$server.Databases | Where-Object IsSystemObject -EQ $false | ForEach-Object {
+	$db = $_
+	$db.Users | Where-Object IsSystemObject -eq $false | ForEach-Object {
+		$dbuser = $_
+		$object = [PSCustomObject] @{
+			Database = $db.Name
+			DBUser = $dbuser.Name
+			Orphaned = if ($dbUser.UserType -eq "NoLogin"){"Yes"} else {"No"}
+			Login = $dbuser.Login
+			LoginType = $dbUser.LoginType
+			}
+			$result += $object
+		}
+	}
+$result | Format-Table -AutoSize
+
+-- Liste des logins et leurs droits
+$servername = "localhost"
+$servername = "localhost"
+$dbname = "NEO_ATOFFICE"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$result = @()
+# Pripriétés de User
+# $server.Databases.Users | Get-Member -MemberType Property
+$server.Databases | Where-Object IsSystemObject -EQ $false | Where-Object Name –eq $dbname | ForEach-Object {
+    $db = $_
+    $db.Users | Where-Object IsSystemObject -eq $false | ForEach-Object {
+        $dbuser = $_
+        $object = [PSCustomObject] @{
+            Database = $db.Name
+            DBUser = $dbuser.Name
+            Orphaned = if ($dbUser.UserType -eq "NoLogin"){"Yes"} else {"No"}
+            Login = $dbuser.Login
+            LoginType = $dbUser.LoginType
+            DBRoles = $dbuser.EnumRoles()
+            ObjectPermissions = ($db.EnumObjectPermissions($dbuser.Name) | SELECT @{N="P";E={$_.ObjectName + " " + $_.PermissionState + " " + $_.PermissionType }} )
+            }
+        $result += $object
+    }
+}
+$result | Format-List
+
+-- Création d'un login
+Import-Module SQLSERVER
+$servername = "(local)"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$loginname = "TestLogin"
+#for this example, we will check if login exists and if it does we will drop it
+if ($server.Logins.Contains($loginname)) {$server.Logins[$loginname].Drop()}
+$login = New-Object "Microsoft.SqlServer.Management.Smo.Login" $server, $loginname
+$login.LoginType = [Microsoft.SqlServer.Management.Smo.LoginType]::SqlLogin
+$login.PasswordExpirationEnabled = $false
+#prompt for password
+$password = Read-Host "Password: " -AsSecureString
+$login.PasswordPolicyEnforced = $false
+$login.Create($password)
+-- Ajouter un role
+#add to server roles
+$loginname = "TestLogin"
+$server.Logins[$loginname].AddToRole("dbcreator")
+
+-- Création d'un User
+Import-Module SQLSERVER
+$servername = "(local)"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+$dbusername = "TestUser"
+$loginname = "TestLogin"
+$db = $server.Databases[$dbname]
+if ($db.Users.Contains($dbusername)){$db.Users[$dbusername].Drop()}
+$dbuser = New-Object "Microsoft.SqlServer.Management.Smo.User" $db, $dbusername
+$dbuser.Login = $loginname
+$dbuser.Create()
+#add database role
+$db.Roles["db_datareader"].AddMember($dbuser.Name)
+-- Ajouter des droits à l'utilisateur sur la table CLIENT
+Import-Module SQLSERVER
+$servername = "(local)"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$dbname = "RAN_ATOFFICE"
+$dbusername = "TestUser"
+$loginname = "TestLogin"
+$db = $server.Databases[$dbname]
+$dbuser = New-Object "Microsoft.SqlServer.Management.Smo.User" $db, $dbusername
+$dbuser.Login = $loginname
+#initial permission is View Definition
+$permissionset = New-Object "Microsoft.SqlServer.Management.Smo.ObjectPermissionSet"([Microsoft.SqlServer.Management.Smo.ObjectPermission]::ViewDefinition)
+#add additional permission: Alter
+$permissionset.Add([Microsoft.SqlServer.Management.Smo.ObjectPermission]::Alter)
+#add permission set to the database view vwAlbums
+$db.Tables["CLIENT"].Grant($permissionset, $dbuser.Name)
+
+---------------- Policy
+-- List des  policies mis en place
+Import-Module SQLSERVER
+Set-Location "SQLSERVER:\SQLPolicy\localhost"
+Set-Location "DEFAULT"
+dir
+-- On peut se délacer dedans
+Set-Location "Policies"
+dir
+--  Evaluer une stratégie
+Get-Item "test" | Invoke-PolicyEvaluation –TargetServerName "localhost"
+
+------------------ Jobs
+-- Liste des Jobs
+Import-Module SQLSERVER
+$servername = "(local)"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+#$server.JobServer | Select-Object *
+$result = @()
+# Propriétés de JobSteps
+#$server.JobServer.Jobs.JobSteps | Get-Member -MemberType Property
+$server.JobServer.Jobs | Foreach-Object {
+    $job = $_
+    $job.JobSteps | ForEach-Object {
+        $jobstep = $_
+        $object = [PSCustomObject] @{
+            Name = $job.Name
+            LastRunDate = $job.LastRunDate
+            LastRunOutcome = $job.LastRunOutcome
+            Step = $jobstep.Name
+            LastStepOutcome = $jobstep.LastRunOutcome
+            }
+        $result += $object
+    }
+}
+$result | Format-Table
+# $result | Format-List
+
+------------------ Requetage classique sur SqlServer
+--------------------------- Avec  Invoke-Sqlcmd
+-- Exemple
+Import-Module SQLSERVER
+$servername = "localhost"
+$database = "RAN_ATOFFICE"
+#query inside a here-string
+$query = @"
+SELECT
+TOP 10 *
+FROM
+dbo.CLIENT
+"@
+#if not providing username and password then uses current context
+Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query | Format-Table
+# Sortie dans un fichier
+Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query | Out-File "C:\Temp_XE\results.rpt"
+# Passer user et mot de passe
+Invoke-Sqlcmd -Username "sa" -Password "admin" -ServerInstance $servername -Database $database -Query $query | Format-Table | Out-File "C:\temp_XE\results.rpt"
+# Sortie dans un CSV  - Si on ne veut pas des entetes : -NoTypeInformation
+Invoke-Sqlcmd -Username "sa" -Password "admin" -ServerInstance $servername -Database $database -Query $query | Export-Csv –NoTypeInformation –Path "C:\Temp\results.csv"
+
+-- Exécuter une requête
+$servername = "(local)"
+$database = "RAN_ATOFFICE"
+$query = "select top 10 RS from CLIENT"
+Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query
+
+-- Lancer une requête écrite dans un fichier
+Import-Module SQLSERVER
+$variables = "TOP = 10"
+$servername = "localhost"
+$database = "RAN_ATOFFICE"
+# texte dans fichier sql.txt : select top $(TOP) NOM, RS, VILLE from CLIENT order by IDCLIENT
+$file = "C:\Temp_XE\sql.txt"  # La requête est là
+Invoke-Sqlcmd -Username "sa" -Password "admin" -ServerInstance $servername -Database $database -InputFile $file -Variable $variables
+
+-- Lancer une requête sur plusieurs servers
+#get a list of databases from a file
+Import-Module SQLSERVER
+$servername = "localhost"
+$file = "C:\Temp_XE\servers.txt"	# dans le fichier il y a une liste de bases
+$query = "Select top 3 NOM, RS, VILLE from CLIENT"
+#execute query to multiple databases
+Get-Content $file | ForEach-Object {Invoke-Sqlcmd -ServerInstance $servername -Database $_ -Query $query}
+
+-- Foemater le résultat d'une requête
+Import-Module SQLSERVER
+$servername = "localhost"
+# texte dans fichier sql.txt : select top $(TOP) NOM, RS, VILLE from CLIENT order by IDCLIENT
+$file = "C:\Temp_XE\sql.txt"   # La requête est là
+$variables = "TOP = 10"
+$results = Invoke-Sqlcmd -ServerInstance $servername -Database $database -InputFile $file -Variable $variables
+#$results | Get-Member # Voir les méthodes et les champs utilisables
+$results | ForEach-Object { #get current row
+    $row = $_
+    "Son nom est " + $row.NOM + ", il habite à " + $row.VILLE
+}
+
+------------SQLCMD exécutable à partir de cmd classique
+-- Voir les paramètres à disposition
+	sqlcmd /?
+-- lancer sqlcmd en se connectant à une base spécifique
+	sqlcmd -s (local) -d RAN_ATOFFICE -U sa -P admin
+	$servername = "(local)"
+	$database = "RAN_ATOFFICE"
+	$query = "select top 10 RS from CLIENT"
+	Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query
+
+-- Voir la défragmentation des index
+Import-Module SQLSERVER
+$servername = "(local)"
+$database = "RAN_ATOFFICE"
+$query = @"
+    SELECT
+        OBJECT_NAME(phys_stats.OBJECT_ID) AS [Object], idx.name AS [Index Name], phys_stats.index_type_desc [Index Type]
+        , phys_stats.avg_fragmentation_in_percent [Fragmentation %], phys_stats.page_count [# Pages]
+    FROM sys.dm_db_index_physical_stats(DB_ID(),NULL, NULL, NULL, N'LIMITED') AS phys_stats
+    INNER JOIN sys.indexes AS idx WITH (NOLOCK) ON phys_stats.[object_id] = idx.[object_id] AND phys_stats.index_id = idx.index_id
+    WHERE phys_stats.database_id = DB_ID()
+    ORDER BY phys_stats.avg_fragmentation_in_percent DESC;
+"@
+#Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query | Format-Table -AutoSize
+Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query | Format-Table -AutoSize | Out-File "C:\Temp_XE\defrag.txt"
+# Convertir en html
+#Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query | ConvertTo-HTML | Out-File "C:\Temp_XE\defrag.htm"
+#Ouvrir le fichier html dans la foulée: Invoke-Expression C:\Temp_XE\defrag.htm
+# Convertir en csv
+#Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query | Export-Csv "C:\Temp_XE\defrag.csv"
+
+-- BACKUP de bases à l'aide de Invoke
+Import-Module SQLSERVER
+$servername = "(local)"
+$database = "RAN_ATOFFICE"
+$query = @"
+    BACKUP DATABASE RAN_ATOFFICE TO DISK='C:\DATA\BKP\RAN_ATOFFICEbyPowershell.bak' WITH FORMAT, COMPRESSION
+"@
+Invoke-Sqlcmd -ServerInstance $servername -Database $database -Query $query
+
+---------------Surveillance d'un serveur
+-- Envoi d'un mail
+Send-MailMessage -To "Manager 1 <Manager1@xyz.com>", "Manager2 <Manager2@xyz.com>" -CC "Manager 3 <Manager3@xyz.com>"
+	-From "Reports Admin <Reportadmin@xyx.com>" -SMTPServer smtp1.xyz.com -Credentials (Get-Credential)
+	-Subject “Daily report” -Body “This is a daily report of servers uptime” -Attachments “c:\temp\server1-uptime-report.txt”, “c:\temp\server2-uptime-report.txt”
+
+-- On peut écrire dans le log
+ Write-EventLog ...
+
+-- Lire le journal d'erreurs
+Import-Module SQLSERVER
+$instance = "(local)"
+$server=New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $instance
+$content = ($server.ReadErrorLog() | Where-Object {$_.Text -like "*failed*" -or $_.Text -like "*error*"})
+
+-- Envoyer un mail suite à une erreur
+Import-Module SQLSERVER
+#current server name
+$servername = "localhost"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+#get the last 10 error entries, and convert to HTML
+$content = ($server.ReadErrorLog() | Where-Object {$_.Text -like "*failed*" -or $_.Text -like "*error*" -or $_.HasErrors -eq $true} | Select-Object LogDate, ProcessInfo, Text, HasErrors -Last 10 | ConvertTo-Html)
+#email settings
+$currdate = Get-Date -Format "yyyy-MM-dd hmmtt"
+$smtp = "smtp.nomadvantage.com"
+$to = "DBA <sdurand@nomadvantage.com>"
+$from = "DBMail <sdurand@nomadvantage.com>"
+$subject = "Last 10 Errors as of $currdate"
+#send the email
+Send-MailMessage -SmtpServer $smtp -To $to -from $from -Subject $subject -Body "$($content)" -BodyAsHtml
+
+-- 
