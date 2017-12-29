@@ -976,4 +976,212 @@ $subject = "Last 10 Errors as of $currdate"
 #send the email
 Send-MailMessage -SmtpServer $smtp -To $to -from $from -Subject $subject -Body "$($content)" -BodyAsHtml
 
--- 
+-- Envoyer un mail d'alerte à propos de l'espace disque
+Import-Module SQLSERVER
+$servername = "(localhost)"
+#if free space % falls below this threshold, assign CSS class "critical" which makes font red
+$criticalthreshold = 10
+#inline css for styling
+$inlinecss = @"
+    <style>table{margin: 0px;border: 1px solid #7e7e7e;background-color: #fafafa;border-collapse: collapse;}
+        #every other row has different color
+        tr:nth-child(even){background-color: #d5e4f4;}
+        th, td{width: 100px;text-align: left;}
+        th{background-color:#a6bdd6;font-weight:bold;}
+        #anything marked as critical is styled bold and red
+        .critical, .critical td{color: red;font-weight: bold;}
+    </style>
+"@
+#construct the html content
+$htmlhead = "<head><title>Disk Space Report </title>$($inlinecss)</head>"
+$htmlbody = "<body>"
+$htmlbody += "<p>$($subject)</p>"
+#below creates table headers
+$htmlbody += "<table><tbody>"
+$htmlbody += "<th>Device ID</th>"
+$htmlbody += "<th>Size (GB)</th>"
+$htmlbody += "<th>Free Space (GB)</th>"
+$htmlbody += "<th>Free Space (%)</th>"
+#table content is dynamically generated from Get-WmiObject here we extract disk usage to look only at Local Disk, add filter for DriveType -eq 3
+Get-WmiObject -Class Win32_LogicalDisk -ComputerName $servername | ForEach-Object {
+    $disk = $_
+    $size = "{0:N1}" -f ($disk.Size/1GB)
+    $freespace = "{0:N1}" -f ($disk.FreeSpace/1GB)
+    if ($disk.Size -gt 0){$freespacepercent = "{0:P0}" -f ($disk.FreeSpace/$disk.Size)}
+    else{$freespacepercent = ""}
+    if ($freespacepercent -ne "" -and $freespacepercent -le $criticalthreshold) {$htmlbody += "<tr class='critical'>"}
+    else {$htmlbody += "<tr>"}
+    $htmlbody += "<td>$($disk.DeviceID)</td>"
+    $htmlbody += "<td>$($size)</td>"
+    $htmlbody += "<td>$($freespace)</td>"
+    $htmlbody += "<td>$($freespacepercent)</td>"
+    $htmlbody += "</tr>"
+    }
+$htmlbody += "</tbody></table></body></html>"
+#compose full html content
+$htmlcontent = $htmlhead + $htmlbody
+#email settings
+$currdate = Get-Date -Format "yyyy-MM-dd hmmtt"
+$smtp = "mail.rogue.local"
+$to = "DBA <administrator@rogue.local>"
+$from = "DBMail <dbmail@administrator.local>"
+$subject = "Disk Space Report for $servername as of $currdate"
+Send-MailMessage -SmtpServer $smtp -To $to -from $from -Subject
+$subject -Body "$($htmlcontent)" -BodyAsHtml
+
+-- Ajout d'une erreur dans le journal en cas de survenue d'un événement particulier
+-- Ici: blocage d'un login
+Import-Module SQLSERVER
+$logname = "Application"
+$source = "SQL Server Custom"
+$servername = "(local)"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+$blockedprocesses = $server.EnumProcesses() | Where-Object IsSystem -eq $false | Where-Object BlockingSpid -gt 0 | Select-Object Spid, Database, BlockingSpid, Login, Status
+#check if Event Log source exists, otherwise create
+if(!([System.Diagnostics.EventLog]::SourceExists($source))) {
+    Write-Output "Creating a new source"
+    New-EventLog -LogName $logname -Source $source
+    }
+#compose message
+$message = "Blocked Process Identified `r`n`r`n" + $blockedprocesses
+#write to event log with custom source
+Write-EventLog -LogName $logname -Source $source -EventId 1 -EntryType Warning -Message $message
+
+-- Liste des métriques à disposition
+$servername = "NDV1339"
+Get-Counter -ComputerName $servername -ListSet * | Sort-Object CounterSetName | Select-Object CounterSetName | Format-Table
+
+-- Créer un collecteur de données pour l'Analyseur de performances de Windows
+$servername = "NDV1339" # or localhost
+#data collector set name
+$dcsname = "SQL Performance Metrics"
+$dcs = New-Object -COM Pla.DataCollectorSet
+$dcs.DisplayName = $dcsname
+#subdirectory format will have year and month enum value is plaYearMonth, which is 0x0800
+$dcs.SubdirectoryFormat = 0x0800
+#specify path where data collector set will be stored
+#typically this will be in the system drive
+$dcs.RootPath = "%systemdrive%\PerfLogs\Admin\" + $dcsname
+#now need to set up each file
+$datacollector = $dcs.DataCollectors.CreateDataCollector(0)
+#file format is binary
+#enum is plaBinary = 3
+$datacollector.LogFileFormat = 3
+$datacollector.FileName = $dcsname + "_"
+#filename format will have year, month and day
+#enum value is plaYearMonthDay 0x1000
+$datacollector.FileNameFormat = 0x1000
+$datacollector.SampleInterval = 15
+$datacollector.LogAppend = $true
+#these are the counters we want to capture
+#you can add more to this, or can pull this from a file
+$counters = @(
+    "\Memory\Available MBytes",
+    "\Network Interface(*)\Bytes Received/sec",
+    "\Network Interface(*)\Bytes Sent/sec",
+    "\PhysicalDisk\Avg. Disk Sec/Read",
+    "\PhysicalDisk\Avg. Disk Sec/Write",
+    "\PhysicalDisk\Avg. Disk Queue Length",
+    "\Processor(_Total)\% Processor Time"
+)
+#add the counters to the data collector
+$datacollector.PerformanceCounters = $counters
+$dcs.DataCollectors.Add($datacollector)
+#save datacollectorset
+#name, server, commit mode, createnewormodify
+$dcs.Commit("$dcsname" , $servername , 0x0003)
+--# Lancer l'analyse
+$dcs.start($false)
+
+-- Utilisation d'une fonction
+#----------------------------------------
+# simple function definition
+#----------------------------------------
+function Get-Tables
+{
+Import-Module SQLSERVER
+$servername = "localhost" # or localhost
+$databasename = "RAN_ATOFFICE"
+$server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+
+$server.Databases[$databasename].Tables
+}
+#----------------------------------------
+# invoke
+#----------------------------------------
+Get-Tables
+
+-- Exemple de fonction
+function Get-Tables
+{
+    <#
+        .SYNOPSIS
+            Function that retrieves tables from a database
+        .DESCRIPTION
+            Function that retrieves tables from a database
+        .PARAMETER servername
+        .PARAMETER databasename
+        .EXAMPLE
+            Get-Tables -servername "Rogue" -databasename "Registration"
+        .EXAMPLE
+            Get-Tables "Rogue" "Registration"
+        .EXAMPLE
+            "Rogue", "Registration" | Get-Tables
+        .INPUTS
+            System.String,System.String
+        .OUTPUTS
+        .NOTES
+        .LINK
+    #>
+    [CmdletBinding()]
+    param
+    (
+        #parameter 1
+        [parameter(
+            Mandatory=$true,
+            ValueFromPipeline=$true,
+            ValueFromPipelineByPropertyName=$true,
+            HelpMessage='Which server are you using?')]
+            [Alias('host')]
+            [string]$servername,
+        #parameter 2
+        [parameter(
+            Mandatory=$true,
+            ValueFromPipeline=$true,
+            ValueFromPipelineByPropertyName=$true,
+            HelpMessage='Which database are you using?')]
+        [Alias('database')]
+        [string]$databasename
+    )
+    begin
+    {
+        Import-Module SQLSERVER
+        $server = New-Object "Microsoft.SqlServer.Management.Smo.Server" $servername
+    }
+    process
+    {
+        try
+        {
+            $server.Databases[$databasename].Tables
+        }
+        catch
+        {
+            Write-Warning $error
+        }
+        finally {}
+    }
+    end{}
+}
+#----------------------------------------
+# invoke
+#----------------------------------------
+"localhost", "RAN_ATOFFICE" | Get-Tables
+#----------------------------------------
+# get help
+#----------------------------------------
+Get-Help Get-Tables -full
+
+-- Créer des modules
+-- connaitre le chemin des modules
+($env:PSModulePath -split ";")
+-- Extension des modules : .psm1

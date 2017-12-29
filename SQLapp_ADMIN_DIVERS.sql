@@ -257,11 +257,33 @@ select is_auto_update_stats_async_on,is_auto_update_stats_on, is_auto_create_sta
 select CAST(ROUND((modified_extent_page_count*100.0)/allocated_extent_page_count,2) as decimal(6,2)) AS 'DiffChangePct' ,modified_extent_page_count ,allocated_extent_page_count 
 from sys.dm_db_file_space_usage GO
 
+-- Voir les compteurs
+-- Voir les métriques dispo à l'aide du PDF "perfmon counters of interest"
+SELECT *
+FROM sys.dm_os_performance_counters
+WHERE object_name = 'SQLServer:Buffer Manager' AND counter_name = 'Free Pages'
+
+-- Usage des DD
+-- Log des Sauvegardes
+-- Surveillance des stats et des index
+
+/*
+------Monitoring
+https://technet.microsoft.com/fr-fr/library/ms191199(v=sql.105).aspx
+https://www.mssqltips.com/sql-server-tip-category/54/monitoring/
+https://docs.microsoft.com/fr-fr/sql/relational-databases/performance/performance-monitoring-and-tuning-tools
+https://docs.microsoft.com/fr-fr/sql/relational-databases/performance/monitor-and-tune-for-performance
+https://blog.serverdensity.com/monitor-sql-server/
+*/
+
 
 /*
 https://blogs.technet.microsoft.com
-https://www.mssqltips.com/sqlservertip
+https://www.mssqltips.com/
 https://www.databasejournal.com
 https://akawn.com/blog
 http://www.sqlservergeeks.com
 */
+
+
+
